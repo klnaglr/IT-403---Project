@@ -1,0 +1,290 @@
+{% extends 'myapp/base.html' %}
+
+{% block title %}Bulk Section Operations{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="bi bi-layers"></i> Bulk Section Operations
+                    </h2>
+                    <p class="text-muted mb-0">
+                        Manage multiple sections at once
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'manage_sections' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left"></i> Back to Sections
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Sections Selection -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-people"></i> Select Sections
+                    </h5>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAll()">
+                            <i class="bi bi-check-all"></i> Select All
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectNone()">
+                            <i class="bi bi-x"></i> Select None
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if sections %}
+                        <div class="sections-list" id="sectionsList">
+                            {% for section in sections %}
+                                <div class="section-item mb-3 p-3 border rounded" data-section-id="{{ section.id }}">
+                                    <div class="form-check">
+                                        <input class="form-check-input section-checkbox" type="checkbox" 
+                                               value="{{ section.id }}" id="section_{{ section.id }}">
+                                        <label class="form-check-label w-100" for="section_{{ section.id }}">
+                                            <div class="d-flex justify-content-between align-items-start">
+                                                <div class="flex-grow-1">
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <h6 class="mb-0">{{ section.name }}</h6>
+                                                        <span class="badge bg-secondary ms-2">{{ section.code }}</span>
+                                                    </div>
+                                                    
+                                                    {% if section.description %}
+                                                        <p class="text-muted small mb-2">{{ section.description }}</p>
+                                                    {% endif %}
+                                                    
+                                                    <div class="small text-muted">
+                                                        <span class="me-3">
+                                                            <i class="bi bi-person"></i> 
+                                                            {{ section.student_count }} students
+                                                        </span>
+                                                        <span class="me-3">
+                                                            <i class="bi bi-clipboard"></i> 
+                                                            {{ section.surveys.count }} surveys
+                                                        </span>
+                                                        <span>
+                                                            <i class="bi bi-calendar"></i> 
+                                                            Created {{ section.created_at|date:"M d, Y" }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="btn-group" role="group">
+                                                    <a href="{% url 'edit_section' section.id %}" class="btn btn-outline-primary btn-sm">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <a href="{% url 'delete_section' section.id %}" 
+                                                       class="btn btn-outline-danger btn-sm"
+                                                       onclick="return confirm('Are you sure you want to delete this section?')">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-people display-1 text-muted"></i>
+                            <h5 class="text-muted mt-3">No sections found</h5>
+                            <p class="text-muted">Create sections first to manage them.</p>
+                            <a href="{% url 'manage_sections' %}" class="btn btn-primary">
+                                <i class="bi bi-plus"></i> Create Sections
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Operations Form -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-gear"></i> Bulk Operations
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="bulkForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.action.id_for_label }}" class="form-label">Action</label>
+                            {{ form.action }}
+                            {% if form.action.errors %}
+                                <div class="text-danger small">{{ form.action.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        {{ form.section_ids }}
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+                                <i class="bi bi-check"></i> Execute Action
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Selected Sections Summary -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check"></i> Selected Sections
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="selectedSummary">
+                        <p class="text-muted mb-0">No sections selected</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Descriptions -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle"></i> Action Descriptions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="action-descriptions">
+                        <div class="mb-3">
+                            <h6 class="text-danger">
+                                <i class="bi bi-trash"></i> Delete Selected
+                            </h6>
+                            <p class="small text-muted mb-0">
+                                Permanently removes selected sections. Cannot be undone.
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-success">
+                                <i class="bi bi-check-circle"></i> Activate Selected
+                            </h6>
+                            <p class="small text-muted mb-0">
+                                Activates all surveys assigned to selected sections.
+                            </p>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-warning">
+                                <i class="bi bi-x-circle"></i> Deactivate Selected
+                            </h6>
+                            <p class="small text-muted mb-0">
+                                Deactivates all surveys assigned to selected sections.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.section-item {
+    transition: all 0.2s ease-in-out;
+}
+.section-item:hover {
+    background-color: #f8f9fa;
+}
+.section-checkbox:checked + label .section-item {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const actionSelect = document.getElementById('{{ form.action.id_for_label }}');
+    const sectionIdsField = document.getElementById('{{ form.section_ids.id_for_label }}');
+    const submitBtn = document.getElementById('submitBtn');
+    const selectedSummary = document.getElementById('selectedSummary');
+    
+    // Handle section selection
+    const checkboxes = document.querySelectorAll('.section-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedSections);
+    });
+    
+    function updateSelectedSections() {
+        const selectedIds = Array.from(document.querySelectorAll('.section-checkbox:checked'))
+            .map(cb => cb.value);
+        
+        sectionIdsField.value = selectedIds.join(',');
+        
+        // Update summary
+        if (selectedIds.length > 0) {
+            selectedSummary.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><strong>${selectedIds.length}</strong> sections selected</span>
+                    <span class="badge bg-primary">${selectedIds.length}</span>
+                </div>
+            `;
+        } else {
+            selectedSummary.innerHTML = '<p class="text-muted mb-0">No sections selected</p>';
+        }
+        
+        updateSubmitButton();
+    }
+    
+    function updateSubmitButton() {
+        const hasSelection = sectionIdsField.value.length > 0;
+        const hasAction = actionSelect.value !== '';
+        
+        submitBtn.disabled = !(hasSelection && hasAction);
+        
+        if (hasSelection && hasAction) {
+            submitBtn.classList.remove('btn-primary');
+            submitBtn.classList.add('btn-danger');
+            submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Execute Action';
+        } else {
+            submitBtn.classList.remove('btn-danger');
+            submitBtn.classList.add('btn-primary');
+            submitBtn.innerHTML = '<i class="bi bi-check"></i> Execute Action';
+        }
+    }
+    
+    // Form submission confirmation
+    document.getElementById('bulkForm').addEventListener('submit', function(e) {
+        const action = actionSelect.value;
+        const selectedCount = sectionIdsField.value.split(',').length;
+        
+        let message = `Are you sure you want to ${action.replace('_', ' ')} ${selectedCount} section(s)?`;
+        
+        if (action === 'delete') {
+            message = `⚠️ WARNING: This will permanently delete ${selectedCount} section(s). This action cannot be undone!`;
+        }
+        
+        if (!confirm(message)) {
+            e.preventDefault();
+        }
+    });
+});
+
+function selectAll() {
+    document.querySelectorAll('.section-checkbox').forEach(cb => {
+        cb.checked = true;
+        cb.dispatchEvent(new Event('change'));
+    });
+}
+
+function selectNone() {
+    document.querySelectorAll('.section-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change'));
+    });
+}
+</script>
+{% endblock %}
